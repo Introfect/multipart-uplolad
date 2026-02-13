@@ -15,7 +15,12 @@
   "env": {
     "dev": {
       "vars": {
-        "JWT_SECRET": "j4fSBaJrAKr1kY62r/MvbhUhaaPNVJUJDEW0+/3Q7SI="
+        "JWT_SECRET": "j4fSBaJrAKr1kY62r/MvbhUhaaPNVJUJDEW0+/3Q7SI=",
+        "R2_ACCOUNT_ID": "replace-with-account-id",
+        "R2_BUCKET": "mist-uploads-dev",
+        "R2_PUBLIC_BASE_URL": "https://files.ktimf.com",
+        "R2_ACCESS_KEY_ID": "replace-with-r2-access-key-id",
+        "R2_SECRET_ACCESS_KEY": "replace-with-r2-secret-access-key"
       },
       "hyperdrive": [
         {
@@ -27,7 +32,12 @@
     },
     "production": {
       "vars": {
-        "JWT_SECRET": "j4fSBaJrAKr1kY62r/MvbhUhaaPNVJUJDEW0+/3Q7SI="
+        "JWT_SECRET": "j4fSBaJrAKr1kY62r/MvbhUhaaPNVJUJDEW0+/3Q7SI=",
+        "R2_ACCOUNT_ID": "replace-with-account-id",
+        "R2_BUCKET": "mist-uploads",
+        "R2_PUBLIC_BASE_URL": "https://files.ktimf.com",
+        "R2_ACCESS_KEY_ID": "replace-with-r2-access-key-id",
+        "R2_SECRET_ACCESS_KEY": "replace-with-r2-secret-access-key"
       },
       "hyperdrive": [
         {

@@ -8,6 +8,20 @@
       "when": 1770976590135,
       "tag": "0000_dizzy_silver_fox",
       "breakpoints": true
+    },
+    {
+      "idx": 1,
+      "version": "7",
+      "when": 1770983451450,
+      "tag": "0001_lush_donald_blake",
+      "breakpoints": true
+    },
+    {
+      "idx": 2,
+      "version": "7",
+      "when": 1770985145116,
+      "tag": "0002_add_tender_1",
+      "breakpoints": true
     }
   ]
 }

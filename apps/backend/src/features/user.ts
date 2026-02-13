@@ -2,7 +2,7 @@ import { WithDb } from "../utils/commonTypes";
 import { UserTable, RoleTable, UserRoleTable } from "./db/schema";
 import { eq, and } from "drizzle-orm";
 import { ErrorCodes } from "../utils/error";
-import { hashPassword, verifyPassword } from "./auth";
+import { hashPassword } from "./auth";
 
 export async function createUser({
   email,
@@ -40,7 +40,11 @@ export async function createUser({
 export async function getUserByEmail({
   email,
   db,
-}: WithDb<{ email: string }>) {
+}: WithDb<{ email: string }>): Promise<{
+  id: string;
+  email: string;
+  passwordHash: string;
+} | null> {
   const trimmedEmail = email.trim().toLowerCase();
 
   const users = await db
@@ -62,7 +66,14 @@ export async function getUserByEmail({
 export async function getUserByIdWithRoles({
   id,
   db,
-}: WithDb<{ id: string }>) {
+}: WithDb<{ id: string }>): Promise<{
+  id: string;
+  email: string;
+  firmName: string | null;
+  name: string | null;
+  phoneNumber: string | null;
+  roles: Array<{ roleId: string; roleName: string }>;
+} | null> {
   const users = await db
     .select({
       id: UserTable.id,

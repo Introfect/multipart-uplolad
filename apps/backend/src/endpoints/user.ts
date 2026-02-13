@@ -1,15 +1,14 @@
-import {
-  getOpenApiClientErrorResponse,
-  jsonContent,
-  getOpenapiResponse,
-  ApiKeyHeaderSchema,
-} from "../utils/openapi";
-import { ErrorCodes, handleApiErrors } from "../utils/error";
-import { getHono } from "../utils/hono";
 import { z } from "@hono/zod-openapi";
+import { getUserFromApiKey } from "../features/auth";
 import { connectDb } from "../features/db/connect";
 import { onboardUser } from "../features/user";
-import { getUserFromApiKey } from "../features/auth";
+import { ErrorCodes, handleApiErrors } from "../utils/error";
+import { getHono } from "../utils/hono";
+import {
+  ApiKeyHeaderSchema,
+  getOpenApiClientErrorResponse,
+  jsonContent,
+} from "../utils/openapi";
 
 export const userEndpoint = getHono();
 
@@ -31,7 +30,7 @@ userEndpoint.openapi(
     },
     responses: {
       200: {
-        description: "Successful Response",
+        description: "Successful response",
         content: {
           "application/json": {
             schema: z.object({
@@ -50,7 +49,7 @@ userEndpoint.openapi(
         errorCodesSchema: z.enum([ErrorCodes.USER_NOT_FOUND]),
       }),
       500: getOpenApiClientErrorResponse({
-        errorCodesSchema: z.literal("INTERNAL_ERROR" as const),
+        errorCodesSchema: z.literal("INTERNAL_ERROR"),
       }),
     },
   },
@@ -58,37 +57,58 @@ userEndpoint.openapi(
     try {
       const db = connectDb({ env: c.env });
       const apiKey = c.req.valid("header")["x-api-key"];
-      const { firmName, name, phoneNumber } = c.req.valid("json");
+      const request = c.req.valid("json");
 
-      const userRes = await getUserFromApiKey({ apiKey, db, env: c.env });
+      const authResult = await getUserFromApiKey({ apiKey, db, env: c.env });
+      if (!authResult.ok) {
+        if (
+          authResult.errorCode !== ErrorCodes.INVALID_API_KEY &&
+          authResult.errorCode !== ErrorCodes.USER_NOT_FOUND
+        ) {
+          return c.json(
+            {
+              ok: false,
+              errorCode: "INTERNAL_ERROR",
+              error: authResult.error,
+            } as const,
+            500
+          );
+        }
 
-      if (!userRes.ok) {
         return c.json(
           {
             ok: false,
-            errorCode: userRes.errorCode as
-              | typeof ErrorCodes.INVALID_API_KEY
-              | typeof ErrorCodes.USER_NOT_FOUND,
-            error: userRes.error,
+            errorCode: authResult.errorCode,
+            error: authResult.error,
           } as const,
           401
         );
       }
 
-      const onboardRes = await onboardUser({
-        userId: userRes.user.id,
-        firmName,
-        name,
-        phoneNumber,
+      const onboardingResult = await onboardUser({
         db,
+        userId: authResult.user.id,
+        firmName: request.firmName,
+        name: request.name,
+        phoneNumber: request.phoneNumber,
       });
+      if (!onboardingResult.ok) {
+        if (onboardingResult.errorCode !== ErrorCodes.USER_NOT_FOUND) {
+          return c.json(
+            {
+              ok: false,
+              errorCode: "INTERNAL_ERROR",
+              error: onboardingResult.error,
+            } as const,
+            500
+          );
+        }
 
-      if (!onboardRes.ok) {
         return c.json(
           {
             ok: false,
-            errorCode: onboardRes.errorCode as typeof ErrorCodes.USER_NOT_FOUND,
-            error: onboardRes.error,
+            errorCode: onboardingResult.errorCode,
+            error: onboardingResult.error,
           } as const,
           404
         );
@@ -96,7 +116,15 @@ userEndpoint.openapi(
 
       return c.json({ ok: true } as const, 200);
     } catch (err) {
-      return handleApiErrors(c, err);
+      const normalizedError =
+        err instanceof Error ||
+        typeof err === "string" ||
+        typeof err === "number" ||
+        typeof err === "boolean" ||
+        typeof err === "object"
+          ? err
+          : undefined;
+      return handleApiErrors(c, normalizedError);
     }
   }
 );

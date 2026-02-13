@@ -1,7 +1,7 @@
 import { WithDbAndEnv, WithEnv } from "../utils/commonTypes";
 import * as jwt from "@tsndr/cloudflare-worker-jwt";
 import { ErrorCodes } from "../utils/error";
-import { getUserByEmail, getUserByIdWithRoles } from "./user";
+import { getUserByIdWithRoles } from "./user";
 import bcrypt from "bcryptjs";
 
 export async function hashPassword(password: string): Promise<string> {
@@ -47,7 +47,7 @@ export async function verifyApiKey({
   return { ok: true, userId } as const;
 }
 
-type UserWithRoles = {
+export type UserWithRoles = {
   id: string;
   email: string;
   firmName: string | null;
@@ -56,7 +56,7 @@ type UserWithRoles = {
   roles: Array<{ roleId: string; roleName: string }>;
 };
 
-type AuthResult =
+export type AuthResult =
   | { ok: true; user: UserWithRoles }
   | { ok: false; errorCode: ErrorCodes; error: string };
 
@@ -89,4 +89,37 @@ export async function getUserFromApiKey({
     ok: true,
     user,
   } as const;
+}
+
+function userHasRole({
+  user,
+  roleName,
+}: {
+  user: UserWithRoles;
+  roleName: string;
+}): boolean {
+  return user.roles.some((role) => role.roleName === roleName);
+}
+
+export async function getUserFromApiKeyWithRole({
+  apiKey,
+  db,
+  env,
+  roleName,
+}: WithDbAndEnv<{ apiKey: string; roleName: string }>): Promise<AuthResult> {
+  const authResult = await getUserFromApiKey({ apiKey, db, env });
+
+  if (!authResult.ok) {
+    return authResult;
+  }
+
+  if (!userHasRole({ user: authResult.user, roleName })) {
+    return {
+      ok: false,
+      errorCode: ErrorCodes.FORBIDDEN_ROLE,
+      error: `Missing required role: ${roleName}`,
+    } as const;
+  }
+
+  return authResult;
 }
