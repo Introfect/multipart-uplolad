@@ -4,11 +4,11 @@
  */
 {
   "$schema": "node_modules/wrangler/config-schema.json",
-  "name": "backend",
+  "name": "multipart-upload-backend",
   "main": "src/index.ts",
   "compatibility_date": "2025-05-05",
   "observability": {
-    "enabled": true
+    "enabled": true,
   },
   "placement": { "mode": "smart" },
   "compatibility_flags": ["nodejs_compat"],
@@ -22,9 +22,9 @@
         {
           "binding": "DB",
           "id": "<invalid_id_for_local>",
-          "localConnectionString": "postgresql://postgres:postgres@127.0.0.1:54422/postgres"
-        }
-      ]
+          "localConnectionString": "postgresql://postgres:postgres@127.0.0.1:54422/postgres",
+        },
+      ],
     },
     "production": {
       "vars": {
@@ -34,17 +34,17 @@
         "R2_PUBLIC_BASE_URL": "https://files.ktimf.com",
         "R2_ACCESS_KEY_ID": "replace-with-r2-access-key-id",
         "R2_SECRET_ACCESS_KEY": "replace-with-r2-secret-access-key",
-        "UPLOAD_DEBUG_ERRORS": "false"
+        "UPLOAD_DEBUG_ERRORS": "false",
       },
       "hyperdrive": [
         {
           "binding": "DB",
           "id": "97baa54916d54d71b7f5abfa0cffc807",
-          "localConnectionString": "postgresql://postgres.rgxzyniozrqauhsyfdyk:V2l7AqhngsQAeoDA@aws-0-ap-south-1.pooler.supabase.com:5432/postgres"
-        }
-      ]
-    }
-  }
+          "localConnectionString": "postgresql://postgres.rgxzyniozrqauhsyfdyk:V2l7AqhngsQAeoDA@aws-0-ap-south-1.pooler.supabase.com:5432/postgres",
+        },
+      ],
+    },
+  },
   /**
    * Smart Placement
    * Docs: https://developers.cloudflare.com/workers/configuration/smart-placement/#smart-placement
