@@ -4,7 +4,8 @@
  */
 {
   "$schema": "node_modules/wrangler/config-schema.json",
-  "name": "multipart-upload-backend",
+  // apps/backend/wrangler.jsonc
+  "name": "multipart-uplolad-backend",
   "main": "src/index.ts",
   "compatibility_date": "2025-05-05",
   "observability": {
