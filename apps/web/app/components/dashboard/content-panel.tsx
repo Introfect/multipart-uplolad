@@ -1,40 +1,142 @@
+import { Form, Link, useNavigation } from "react-router";
+import {
+  Alert,
+  AlertContent,
+  AlertDescription,
+  AlertIcon,
+  AlertTitle,
+} from "~/components/ui/alert";
 import { Badge } from "~/components/ui/badge";
 import { Button } from "~/components/ui/button";
 import { Separator } from "~/components/ui/separator";
-import { Alert, AlertIcon, AlertContent, AlertTitle, AlertDescription } from "~/components/ui/alert";
 
-interface ProgressItem {
-  label: string;
-  status: "uploaded" | "pending" | "waiting";
-  completed: boolean;
-}
+type DashboardPrimaryAction =
+  | {
+      kind: "apply";
+      label: string;
+      tenderId: string;
+    }
+  | {
+      kind: "continue";
+      label: string;
+      href: string;
+    }
+  | {
+      kind: "disabled";
+      label: string;
+    }
+  | {
+      kind: "status";
+      label: string;
+      status: string;
+    };
 
-interface ContentPanelProps {
+type ContentPanelProps = {
   tender: {
     refNumber: string;
     status: string;
     scopeSummary: string;
     mandatoryNotice: { title: string; description: string };
-    primaryAction: string;
+    primaryAction: DashboardPrimaryAction;
     secondaryAction: string;
-    progress: ProgressItem[];
-    progressPercent: number;
   };
-}
-
-const statusColors: Record<string, string> = {
-  uploaded: "text-success",
-  pending: "text-primary",
-  waiting: "text-muted-foreground",
+  isApplySubmitting: boolean;
 };
 
-export function ContentPanel({ tender }: ContentPanelProps) {
-  return (
-    <div className="flex flex-col p-8  relative lg:p-12 min-h-screen">
-      <div className="max-w-lg min-h-full  mx-auto flex-1 w-full flex flex-col h-full  justify-between ">
-        {/* Mobile brand header */}
-        <div>
+function renderPrimaryAction({
+  primaryAction,
+  isApplySubmitting,
+}: {
+  primaryAction: DashboardPrimaryAction;
+  isApplySubmitting: boolean;
+}) {
+  const navigation = useNavigation();
 
+  if (primaryAction.kind === "apply") {
+    return (
+      <Form method="post" className="w-full">
+        <input type="hidden" name="intent" value="apply" />
+        <input type="hidden" name="tenderId" value={primaryAction.tenderId} />
+        <Button
+          variant="default"
+          className="w-full"
+          type="submit"
+          disabled={isApplySubmitting}
+        >
+          {isApplySubmitting ? (
+            <span className="flex items-center gap-2">
+              <span className="size-3 border-2 border-current border-t-transparent rounded-full animate-spin" />
+              Applying...
+            </span>
+          ) : (
+            <>
+              {primaryAction.label}
+              <span className="material-symbols-outlined text-[14px] leading-[14px] ml-auto">
+                arrow_forward
+              </span>
+            </>
+          )}
+        </Button>
+      </Form>
+    );
+  }
+
+  if (primaryAction.kind === "continue") {
+    const isNavigating =
+      navigation.state !== "idle" &&
+      navigation.location.pathname === primaryAction.href;
+
+    return (
+      <Button
+        variant="default"
+        className="w-full"
+        asChild
+        disabled={isNavigating}
+      >
+        <Link to={primaryAction.href}>
+          {isNavigating ? (
+            <span className="flex items-center gap-2">
+              <span className="size-3 border-2 border-current border-t-transparent rounded-full animate-spin" />
+              Opening...
+            </span>
+          ) : (
+            <>
+              {primaryAction.label}
+              <span className="material-symbols-outlined text-[14px] leading-[14px] ml-auto">
+                arrow_forward
+              </span>
+            </>
+          )}
+        </Link>
+      </Button>
+    );
+  }
+
+  if (primaryAction.kind === "status") {
+    return (
+      <div className="w-full p-3 bg-secondary/50 border border-primary/20 rounded-md flex items-center justify-between">
+        <span className="text-[12px] font-medium text-foreground">
+          {primaryAction.label}
+        </span>
+        <Badge variant="live" className="text-primary border-primary/30">
+          {primaryAction.status}
+        </Badge>
+      </div>
+    );
+  }
+
+  return (
+    <Button variant="default" className="w-full" disabled>
+      {primaryAction.label}
+    </Button>
+  );
+}
+
+export function ContentPanel({ tender, isApplySubmitting }: ContentPanelProps) {
+  return (
+    <div className="flex flex-col p-8 relative lg:p-12 min-h-screen">
+      <div className="max-w-lg min-h-full mx-auto flex-1 w-full flex flex-col h-full justify-between">
+        <div>
           <div className="flex items-center gap-3 lg:hidden">
             <div className="size-8 bg-foreground flex items-center justify-center">
               <span className="material-symbols-outlined text-[16px] leading-[16px] text-background">
@@ -45,7 +147,7 @@ export function ContentPanel({ tender }: ContentPanelProps) {
               MIST
             </span>
           </div>
-          {/* Tender meta */}
+
           <div className="space-y-4">
             <div className="flex items-center justify-between">
               <span className="text-[10px] font-bold uppercase tracking-[2px] leading-[15px] text-muted-foreground">
@@ -69,6 +171,7 @@ export function ContentPanel({ tender }: ContentPanelProps) {
             </div>
             <Separator />
           </div>
+
           <div className="space-y-4">
             <h3 className="text-[10px] font-bold uppercase tracking-[2px] leading-[15px] text-primary">
               Scope Summary
@@ -78,27 +181,24 @@ export function ContentPanel({ tender }: ContentPanelProps) {
             </p>
           </div>
         </div>
-        {/* Scope summary */}
+
         <div>
-
-
           <Alert>
             <AlertIcon icon="info" />
-            <AlertContent className="">
+            <AlertContent>
               <AlertTitle>{tender.mandatoryNotice.title}</AlertTitle>
-              <AlertDescription>{tender.mandatoryNotice.description}</AlertDescription>
+              <AlertDescription>
+                {tender.mandatoryNotice.description}
+              </AlertDescription>
             </AlertContent>
           </Alert>
 
-          {/* Action buttons */}
           <div className="space-y-3 mt-6">
-            <Button variant="default" className="w-full">
-              {tender.primaryAction}
-              <span className="material-symbols-outlined text-[14px] leading-[14px] ml-auto">
-                arrow_forward
-              </span>
-            </Button>
-            <Button variant="outline" className="w-full">
+            {renderPrimaryAction({
+              primaryAction: tender.primaryAction,
+              isApplySubmitting,
+            })}
+            <Button variant="outline" className="w-full" disabled>
               <span className="material-symbols-outlined text-[14px] leading-[14px]">
                 download
               </span>
@@ -106,7 +206,6 @@ export function ContentPanel({ tender }: ContentPanelProps) {
             </Button>
           </div>
 
-          {/* Footer */}
           <div className="mt-auto sticky bottom-0 pt-8">
             <Separator />
             <div className="flex items-center justify-center gap-6 pt-6">

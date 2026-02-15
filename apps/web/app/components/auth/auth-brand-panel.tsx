@@ -26,7 +26,7 @@ export function AuthBrandPanel() {
         <img
           src="/login-layout/Modern Architectural Museum Concrete.svg"
           alt=""
-          className="size-full object-contain opacity-70"
+          className="size-full object-cover opacity-70"
         />
       </div>
       <div className="absolute inset-0 z-1">

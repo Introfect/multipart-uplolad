@@ -1,6 +1,9 @@
 import { z } from "@hono/zod-openapi";
 import { getUserFromApiKeyWithRole } from "../features/auth";
-import { getApplicationState, updateApplicationState } from "../features/applicationState";
+import {
+  getApplicationState,
+  updateApplicationState,
+} from "../features/applicationState";
 import { connectDb } from "../features/db/connect";
 import { UploadAllowedRoleName } from "../features/uploadConstants";
 import { ErrorCodes, handleApiErrors } from "../utils/error";
@@ -18,30 +21,34 @@ const PersistedFormStateSchema = z.object({
   singleUploads: z
     .record(
       z.string(),
-      z.object({
-        fileId: z.string(),
-        fileName: z.string(),
-        fileSize: z.number(),
-        mimeType: z.string().optional(),
-        completedAt: z.string(),
-      })
-    )
-    .optional(),
-  multiUploads: z
-    .record(
-      z.string(),
-      z.array(
-        z.object({
-          key: z.string(),
+      z
+        .object({
           fileId: z.string(),
           fileName: z.string(),
           fileSize: z.number(),
           mimeType: z.string().optional(),
           completedAt: z.string(),
         })
-      )
+        .optional(),
     )
-    .optional(),
+    .default({}),
+  multiUploads: z
+    .record(
+      z.string(),
+      z
+        .array(
+          z.object({
+            key: z.string(),
+            fileId: z.string(),
+            fileName: z.string(),
+            fileSize: z.number(),
+            mimeType: z.string().optional(),
+            completedAt: z.string(),
+          }),
+        )
+        .optional(),
+    )
+    .default({}),
 });
 
 // GET /api/v1/application/{submissionId}/state
@@ -90,14 +97,15 @@ applicationStateEndpoint.openapi(
         roleName: UploadAllowedRoleName,
       });
       if (!authResult.ok) {
-        const status = authResult.errorCode === ErrorCodes.FORBIDDEN_ROLE ? 403 : 401;
         return c.json(
           {
             ok: false,
             errorCode: authResult.errorCode,
             error: authResult.error,
           } as const,
-          status
+          authResult.errorCode === ErrorCodes.FORBIDDEN_ROLE
+            ? (403 as const)
+            : (401 as const),
         );
       }
 
@@ -115,11 +123,11 @@ applicationStateEndpoint.openapi(
             errorCode: result.errorCode,
             error: result.error,
           } as const,
-          404
+          404,
         );
       }
 
-      return c.json({ ok: true, data: result.data });
+      return c.json({ ok: true as const, data: result.data }, 200);
     } catch (err) {
       const normalizedError =
         err instanceof Error ||
@@ -131,7 +139,7 @@ applicationStateEndpoint.openapi(
           : undefined;
       return handleApiErrors(c, normalizedError);
     }
-  }
+  },
 );
 
 // POST /api/v1/application/{submissionId}/state
@@ -150,7 +158,6 @@ applicationStateEndpoint.openapi(
         z.object({
           data: PersistedFormStateSchema,
         }),
-        "Form state data"
       ),
     },
     responses: {
@@ -186,14 +193,15 @@ applicationStateEndpoint.openapi(
         roleName: UploadAllowedRoleName,
       });
       if (!authResult.ok) {
-        const status = authResult.errorCode === ErrorCodes.FORBIDDEN_ROLE ? 403 : 401;
         return c.json(
           {
             ok: false,
             errorCode: authResult.errorCode,
             error: authResult.error,
           } as const,
-          status
+          authResult.errorCode === ErrorCodes.FORBIDDEN_ROLE
+            ? (403 as const)
+            : (401 as const),
         );
       }
 
@@ -209,14 +217,14 @@ applicationStateEndpoint.openapi(
         return c.json(
           {
             ok: false,
-            errorCode: result.errorCode,
+            errorCode: "INTERNAL_ERROR" as const,
             error: result.error,
           } as const,
-          500
+          500,
         );
       }
 
-      return c.json({ ok: true, data: result.data });
+      return c.json({ ok: true as const, data: result.data }, 200);
     } catch (err) {
       const normalizedError =
         err instanceof Error ||
@@ -228,5 +236,5 @@ applicationStateEndpoint.openapi(
           : undefined;
       return handleApiErrors(c, normalizedError);
     }
-  }
+  },
 );

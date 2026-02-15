@@ -1,13 +1,36 @@
 import type { AppLoadContext } from "react-router";
+import type { UploadQuestionId } from "@repo/upload-contracts";
 import { fetchBackendJson } from "./backend-api.server";
-
-export type UploadQuestionId = "q1" | "q2" | "q3" | "q4" | "q5";
 
 export type InitiatedUploadPart = {
   partNumber: number;
   url: string;
   expiresAt: string;
 };
+
+export type InitiatedSingleUploadData = {
+  uploadType: "single";
+  uploadSessionId: string;
+  uploadId: string;
+  objectKey: string;
+  expiresAt: string;
+  url: string;
+};
+
+export type InitiatedMultipartUploadData = {
+  uploadType: "multipart";
+  uploadSessionId: string;
+  uploadId: string;
+  objectKey: string;
+  partSizeBytes: number;
+  totalParts: number;
+  expiresAt: string;
+  parts: InitiatedUploadPart[];
+};
+
+export type InitiatedUploadData =
+  | InitiatedSingleUploadData
+  | InitiatedMultipartUploadData;
 
 export type UploadStatusSummary = {
   fileId: string;
@@ -44,15 +67,7 @@ export async function initiateMultipartUpload({
   fileSizeBytes: number;
   contentType: string;
 }) {
-  return fetchBackendJson<{
-    uploadSessionId: string;
-    uploadId: string;
-    objectKey: string;
-    partSizeBytes: number;
-    totalParts: number;
-    expiresAt: string;
-    parts: InitiatedUploadPart[];
-  }>({
+  return fetchBackendJson<InitiatedUploadData>({
     context,
     path: "/api/v1/uploads/initiate",
     init: {
@@ -78,12 +93,14 @@ export async function completeMultipartUploadSession({
   tenderId,
   uploadSessionId,
   parts,
+  etag,
 }: {
   context: AppLoadContext;
   apiKey: string;
   tenderId: string;
   uploadSessionId: string;
-  parts: Array<{ partNumber: number; etag: string }>;
+  parts?: Array<{ partNumber: number; etag: string }>;
+  etag?: string;
 }) {
   return fetchBackendJson<UploadStatusSummary>({
     context,
@@ -98,6 +115,7 @@ export async function completeMultipartUploadSession({
         tenderId,
         uploadSessionId,
         parts,
+        etag,
       }),
     },
   });

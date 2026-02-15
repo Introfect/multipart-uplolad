@@ -7,23 +7,23 @@ interface SubmissionHeaderProps {
 
 export function SubmissionHeader({ title, highlight, subtitle, deadlineLabel }: SubmissionHeaderProps) {
   return (
-    <div className="h-24 shrink-0 border-b border-subtle backdrop-blur-mist bg-[rgba(10,10,10,0.5)] flex items-center justify-between px-8 lg:px-12">
+    <header className="h-24 shrink-0 border-b border-white/5 flex items-center justify-between px-8 lg:px-12 bg-background/50 backdrop-blur-xl z-30">
       <div>
-        <h1 className="text-[18px] leading-[24px] text-foreground font-light">
-          {title} <span className="font-mono italic text-primary">{highlight}</span>
-        </h1>
-        <span className="text-[9px] font-bold uppercase tracking-[2px] leading-[13.5px] text-muted-foreground">
+        <h2 className="text-xl font-light text-white tracking-tight">
+          Museum of <span className="font-mono italic text-primary">Innovation Science and Technology</span>
+        </h2>
+        <p className="text-[10px] text-muted-foreground font-bold uppercase tracking-[0.2em] mt-1">
           {subtitle}
-        </span>
+        </p>
       </div>
-      <div className="text-right hidden sm:block">
-        <span className="text-[9px] font-bold uppercase tracking-[2px] leading-[13.5px] text-muted-foreground block">
-          Submission Deadline
-        </span>
-        <span className="font-mono text-[13px] leading-[18px] text-foreground">
-          {deadlineLabel}
-        </span>
+      <div className="flex items-center gap-6">
+        <div className="flex flex-col items-end">
+          <span className="text-[9px] text-muted-foreground uppercase font-bold tracking-widest">
+            Submission Deadline
+          </span>
+          <span className="text-xs font-mono text-white">{deadlineLabel}</span>
+        </div>
       </div>
-    </div>
+    </header>
   );
 }

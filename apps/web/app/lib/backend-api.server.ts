@@ -5,15 +5,24 @@ type ApiSuccess<T> = {
   data: T;
 };
 
+type JsonValue =
+  | string
+  | number
+  | boolean
+  | null
+  | { [key: string]: JsonValue }
+  | JsonValue[];
+
 type ApiFailure = {
   ok: false;
   errorCode?: string;
   error: string;
+  debug?: JsonValue;
 };
 
 export type BackendJsonResult<T> =
   | { ok: true; data: T; status: number }
-  | { ok: false; status: number; error: string; errorCode?: string };
+  | { ok: false; status: number; error: string; errorCode?: string; debug?: JsonValue };
 
 export function getBackendBaseUrl(context: AppLoadContext): string {
   const env = context.cloudflare?.env as unknown as Record<string, unknown> | undefined;
@@ -73,6 +82,7 @@ export async function fetchBackendJson<T>({
           ? payload.error
           : textFallback || `Request failed (status ${response.status})`,
       errorCode: payload && "errorCode" in payload ? payload.errorCode : undefined,
+      debug: payload && "debug" in payload ? payload.debug : undefined,
     };
   }
 

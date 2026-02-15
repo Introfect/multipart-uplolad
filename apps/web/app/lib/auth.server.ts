@@ -21,7 +21,9 @@ export type AuthUser = {
   roles: Array<{ roleId: string; roleName: string }>;
 };
 
-export async function getApiKeyFromRequest(request: Request): Promise<string | null> {
+export async function getApiKeyFromRequest(
+  request: Request,
+): Promise<string | null> {
   const cookieHeader = request.headers.get("Cookie");
   if (!cookieHeader) {
     return null;
@@ -54,8 +56,12 @@ export async function clearApiKeyCookie(request: Request): Promise<string> {
 
 export function isUserOnboarded(user: AuthUser): boolean {
   return Boolean(
-    user.name?.trim() && user.firmName?.trim() && user.phoneNumber?.trim()
+    user.name?.trim() && user.firmName?.trim() && user.phoneNumber?.trim(),
   );
+}
+
+export function isUserAdmin(user: AuthUser): boolean {
+  return user.roles.some((role) => role.roleName === "admin");
 }
 
 export async function loginWithPassword({

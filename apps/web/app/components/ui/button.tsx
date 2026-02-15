@@ -16,7 +16,7 @@ const buttonVariants = cva(
         ghost: "text-primary hover:bg-primary/10",
       },
       size: {
-        default: "px-4 py-4",
+        default: "px-4 py-3",
         sm: "px-3 py-2 text-[9px]",
         lg: "px-6 py-5",
       },

@@ -1,3 +1,4 @@
+import { useEffect, useState } from "react";
 import { Badge } from "~/components/ui/badge";
 
 interface CountdownItemProps {
@@ -8,7 +9,9 @@ interface CountdownItemProps {
 function CountdownItem({ value, label }: CountdownItemProps) {
   return (
     <div className="text-center">
-      <div className="font-mono text-[48px] leading-[48px] text-foreground">{value}</div>
+      <div className="font-mono text-[48px] leading-[48px] text-foreground">
+        {value}
+      </div>
       <div className="text-[9px] font-bold uppercase tracking-[2px] leading-[13.5px] text-primary mt-2">
         {label}
       </div>
@@ -20,15 +23,58 @@ interface HeroPanelProps {
   tender: {
     refNumber: string;
     title: string;
-    subtitle: string;
+    subtitle?: string;
     phase: string;
     location: string;
     coordinates: string;
-    countdown: { days: string; hours: string; minutes: string };
+    targetDate: string;
   };
 }
 
+function padCounterValue(value: number): string {
+  if (value < 10) {
+    return `0${value}`;
+  }
+  return `${value}`;
+}
+
+function useCountdown(targetIso: string) {
+  const [timeLeft, setTimeLeft] = useState<{
+    days: string;
+    hours: string;
+    minutes: string;
+  }>({ days: "00", hours: "00", minutes: "00" });
+
+  useEffect(() => {
+    const target = new Date(targetIso).getTime();
+
+    const update = () => {
+      const now = Date.now();
+      const diff = Math.max(target - now, 0);
+
+      const totalMinutes = Math.floor(diff / (60 * 1000));
+      const days = Math.floor(totalMinutes / (60 * 24));
+      const hours = Math.floor((totalMinutes % (60 * 24)) / 60);
+      const minutes = totalMinutes % 60;
+
+      setTimeLeft({
+        days: padCounterValue(days),
+        hours: padCounterValue(hours),
+        minutes: padCounterValue(minutes),
+      });
+    };
+
+    update();
+    const interval = setInterval(update, 1000);
+    return () => clearInterval(interval);
+  }, [targetIso]);
+
+  return timeLeft;
+}
+
 export function HeroPanel({ tender }: HeroPanelProps) {
+  const countdown = useCountdown(tender.targetDate);
+
   return (
     <div className="flex flex-col w-full h-full bg-card relative overflow-hidden">
       {/* Background layers */}
@@ -40,10 +86,18 @@ export function HeroPanel({ tender }: HeroPanelProps) {
         />
       </div>
       <div className="absolute inset-0 z-1">
-        <img src="/login-layout/Overlay.png" alt="" className="w-full h-full object-cover" />
+        <img
+          src="/login-layout/Overlay.png"
+          alt=""
+          className="w-full h-full object-cover"
+        />
       </div>
       <div className="absolute inset-0 z-2">
-        <img src="/login-layout/Gradient.svg" alt="" className="w-full h-full object-cover" />
+        <img
+          src="/login-layout/Gradient.svg"
+          alt=""
+          className="w-full h-full object-cover"
+        />
       </div>
 
       {/* Content */}
@@ -70,16 +124,23 @@ export function HeroPanel({ tender }: HeroPanelProps) {
           <Badge variant="live">Active Project</Badge>
 
           <h1 className="font-mono text-[64px] font-medium leading-snug tracking-[-0.5px] text-foreground italic max-w-[500px]">
-            {tender.title} <span className="text-primary">{tender.subtitle}</span>
+            {tender.title}
+            {tender.subtitle ? (
+              <span className="text-primary"> {tender.subtitle}</span>
+            ) : null}
           </h1>
 
           {/* Countdown */}
           <div className="flex items-center gap-12">
-            <CountdownItem value={tender.countdown.days} label="Days" />
-            <div className="text-[32px] text-muted-foreground font-light">:</div>
-            <CountdownItem value={tender.countdown.hours} label="Hours" />
-            <div className="text-[32px] text-muted-foreground font-light">:</div>
-            <CountdownItem value={tender.countdown.minutes} label="Minutes" />
+            <CountdownItem value={countdown.days} label="Days" />
+            <div className="text-[32px] text-muted-foreground font-light">
+              :
+            </div>
+            <CountdownItem value={countdown.hours} label="Hours" />
+            <div className="text-[32px] text-muted-foreground font-light">
+              :
+            </div>
+            <CountdownItem value={countdown.minutes} label="Minutes" />
           </div>
         </div>
 
@@ -90,13 +151,17 @@ export function HeroPanel({ tender }: HeroPanelProps) {
               <div className="text-[9px] font-bold uppercase tracking-[2px] leading-[13.5px] text-muted-foreground mb-1">
                 Phase
               </div>
-              <div className="text-[14px] leading-[20px] text-foreground">{tender.phase}</div>
+              <div className="text-[14px] leading-[20px] text-foreground">
+                {tender.phase}
+              </div>
             </div>
             <div>
               <div className="text-[9px] font-bold uppercase tracking-[2px] leading-[13.5px] text-muted-foreground mb-1">
                 Location
               </div>
-              <div className="text-[14px] leading-[20px] text-foreground">{tender.location}</div>
+              <div className="text-[14px] leading-[20px] text-foreground">
+                {tender.location}
+              </div>
             </div>
           </div>
           <span className="font-mono text-[10px] leading-[15px] text-muted-foreground">

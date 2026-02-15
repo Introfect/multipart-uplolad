@@ -1,4 +1,9 @@
-import { type RouteConfig, index, layout, route } from "@react-router/dev/routes";
+import {
+  type RouteConfig,
+  index,
+  layout,
+  route,
+} from "@react-router/dev/routes";
 
 export default [
   // Auth layout (shared left panel)
@@ -9,9 +14,17 @@ export default [
 
   // Dashboard
   route("dashboard", "routes/dashboard.tsx"),
+  route("admin", "routes/admin.tsx"),
 
   // Form submission
-  route("form/:formId", "routes/form.tsx"),
+  route("form/:submissionId", "routes/form.tsx"),
+  route("form/:submissionId/success", "routes/form.success.tsx"),
+  route("form-upload", "routes/form-upload.ts"),
+  route(
+    "api/application/:submissionId/state",
+    "routes/api.application.$submissionId.state.ts",
+  ),
+  route("logout", "routes/logout.ts"),
 
   // Design system reference
   route("components", "routes/components.tsx"),

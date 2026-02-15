@@ -1,7 +1,7 @@
 import { eq, and } from "drizzle-orm";
 import { ApplicationStateTable, type PersistedFormState } from "./db/schema";
 import { ErrorCodes } from "../utils/error";
-import type { WithEnv } from "../utils/commonTypes";
+import type { WithDbAndEnv } from "../utils/commonTypes";
 
 type ServiceResult<T> =
   | { ok: true; data: T }
@@ -11,7 +11,7 @@ export async function getApplicationState({
   db,
   submissionId,
   userId,
-}: WithEnv<{
+}: WithDbAndEnv<{
   submissionId: string;
   userId: string;
 }>): Promise<ServiceResult<PersistedFormState>> {
@@ -21,8 +21,8 @@ export async function getApplicationState({
     .where(
       and(
         eq(ApplicationStateTable.submissionId, submissionId),
-        eq(ApplicationStateTable.isActive, true)
-      )
+        eq(ApplicationStateTable.isActive, true),
+      ),
     );
 
   if (states.length === 0) {
@@ -41,7 +41,7 @@ export async function updateApplicationState({
   submissionId,
   userId,
   data,
-}: WithEnv<{
+}: WithDbAndEnv<{
   submissionId: string;
   userId: string;
   data: PersistedFormState;

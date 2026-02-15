@@ -38,6 +38,12 @@ export async function loader({ request, context }: Route.LoaderArgs) {
     return null;
   }
 
+  // Check if user is admin
+  const isAdmin = meResult.data.roles.some((role) => role.roleName === "admin");
+  if (isAdmin) {
+    throw redirect("/admin");
+  }
+
   if (isUserOnboarded(meResult.data)) {
     throw redirect("/dashboard");
   }
@@ -59,7 +65,7 @@ export async function action({ request, context }: Route.ActionArgs) {
         success: false,
         error: issue?.message ?? "Invalid form submission",
       },
-      { status: 400 }
+      { status: 400 },
     );
   }
 
@@ -75,7 +81,7 @@ export async function action({ request, context }: Route.ActionArgs) {
         success: false,
         error: loginResult.error || "Unable to sign in. Please try again.",
       },
-      { status: loginResult.status === 401 ? 401 : 400 }
+      { status: loginResult.status === 401 ? 401 : 400 },
     );
   }
 
@@ -91,12 +97,27 @@ export async function action({ request, context }: Route.ActionArgs) {
         success: false,
         error: "Unable to fetch user data. Please try again.",
       },
-      { status: 500 }
+      { status: 500 },
     );
   }
 
   const setCookie = await setApiKeyCookie({ apiKey, request });
-  const destination = isUserOnboarded(userResult.data) ? "/dashboard" : "/onboarding";
+
+  // Check if user is admin
+  const isAdmin = userResult.data.roles.some(
+    (role) => role.roleName === "admin",
+  );
+  if (isAdmin) {
+    return redirect("/admin", {
+      headers: {
+        "Set-Cookie": setCookie,
+      },
+    });
+  }
+
+  const destination = isUserOnboarded(userResult.data)
+    ? "/dashboard"
+    : "/onboarding";
 
   return redirect(destination, {
     headers: {
@@ -108,7 +129,9 @@ export async function action({ request, context }: Route.ActionArgs) {
 export default function Login({ actionData }: Route.ComponentProps) {
   return (
     <>
-      {actionData?.error ? <Toast message={actionData.error} variant="error" /> : null}
+      {actionData?.error ? (
+        <Toast message={actionData.error} variant="error" />
+      ) : null}
       <AuthFormWrapper
         icon={
           <span className="material-symbols-outlined text-[32px] leading-[40px] text-primary">

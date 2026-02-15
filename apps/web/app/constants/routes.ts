@@ -4,7 +4,7 @@ export const ROUTES = {
   DASHBOARD: "/dashboard",
   TENDERS: "/tenders",
   PROFILE: "/profile",
-  FORM: "/form/:formId",
+  FORM: "/form/:submissionId",
   COMPONENTS: "/components",
 } as const;
 
@@ -56,7 +56,7 @@ export const ROUTE_METADATA: Record<RouteKey, RouteMetadata> = {
     layout: "dashboard",
   },
   FORM: {
-    path: "/form/:formId",
+    path: "/form/:submissionId",
     title: "Tender Submission",
     description: "Submit your tender documents and required files",
     requiresAuth: true,

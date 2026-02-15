@@ -1,11 +1,13 @@
 import type { UploadItem } from "~/types/form";
-import { Badge } from "~/components/ui/badge";
 import { cn } from "~/lib/utils";
+import { UploadProgress } from "~/components/ui/upload-progress";
 
 interface UploadRowProps {
   upload: UploadItem;
   onCancel: () => void;
   onDelete: () => void;
+  onRetry?: () => void;
+  disableControls?: boolean;
 }
 
 function formatSize(bytes: number) {
@@ -14,48 +16,143 @@ function formatSize(bytes: number) {
   return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
 }
 
-const statusConfig = {
-  complete: { label: "Complete", variant: "live" as const, icon: "check_circle" },
-  uploading: { label: "Uploading", variant: "default" as const, icon: "sync" },
-  queued: { label: "Queued", variant: "default" as const, icon: "schedule" },
-  error: { label: "Error", variant: "default" as const, icon: "error" },
-};
-
-export function UploadRow({ upload, onCancel, onDelete }: UploadRowProps) {
-  const config = statusConfig[upload.status];
+export function UploadRow({
+  upload,
+  onCancel,
+  onDelete,
+  onRetry,
+  disableControls = false,
+}: UploadRowProps) {
   const isUploading = upload.status === "uploading";
   const isQueued = upload.status === "queued";
+  const isComplete = upload.status === "complete";
+  const isError = upload.status === "error";
+  const isActionDisabled = disableControls || upload.isCancelling;
 
   return (
-    <div className={cn("space-y-2", isQueued && "opacity-50")}>
-      <div className="flex items-center gap-4">
-        <span className="material-symbols-outlined text-[18px] text-primary">description</span>
-        <span className="font-mono text-[13px] leading-[18px] text-foreground flex-1 truncate">
+    <div
+      className={cn(
+        "grid grid-cols-[auto_1fr_100px_auto_50px] items-center gap-4 py-4 px-5 border-b border-white/5 transition-colors",
+        isUploading && "bg-white/5 border-b-primary/20",
+        isQueued && "opacity-50",
+        !isUploading && !isQueued && "bg-white/[0.02] hover:bg-white/[0.05]"
+      )}
+    >
+      {/* Left icon - loader circle when uploading, static icon otherwise */}
+      <div className="flex-shrink-0">
+        {isUploading ? (
+          <svg
+            className="w-5 h-5 text-primary animate-spin"
+            xmlns="http://www.w3.org/2000/svg"
+            fill="none"
+            viewBox="0 0 24 24"
+          >
+            <circle
+              className="opacity-25"
+              cx="12"
+              cy="12"
+              r="10"
+              stroke="currentColor"
+              strokeWidth="4"
+            />
+            <path
+              className="opacity-75"
+              fill="currentColor"
+              d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"
+            />
+          </svg>
+        ) : (
+          <span
+            className={cn(
+              "material-symbols-outlined text-xl",
+              isQueued && "text-muted-foreground",
+              isComplete && "text-primary",
+              isError && "text-destructive"
+            )}
+          >
+            {isQueued ? "hourglass_empty" : isError ? "error" : "description"}
+          </span>
+        )}
+      </div>
+
+      {/* Filename */}
+      <div className="min-w-0">
+        <span
+          className={cn(
+            "text-sm font-medium truncate block",
+            isQueued ? "text-muted-foreground" : "text-white"
+          )}
+        >
           {upload.fileName}
         </span>
-        <span className="font-mono text-[11px] text-muted-foreground">{formatSize(upload.sizeBytes)}</span>
-        <Badge variant={config.variant}>{config.label}</Badge>
-        {upload.status === "complete" && (
-          <button onClick={onDelete} className="text-muted-foreground hover:text-destructive transition-colors">
-            <span className="material-symbols-outlined text-[16px]">delete</span>
-          </button>
-        )}
+      </div>
+
+      {/* Size */}
+      <span className="text-xs font-mono text-muted-foreground text-right">
+        {formatSize(upload.sizeBytes)}
+      </span>
+
+      {/* Status badge + Lottie progress when uploading */}
+      <div className="flex items-center justify-end gap-3">
         {isUploading && (
-          <button onClick={onCancel} className="text-muted-foreground hover:text-destructive transition-colors">
-            <span className="material-symbols-outlined text-[16px]">close</span>
+          <UploadProgress progress={upload.progressPct ?? 0} size="sm" />
+        )}
+        <span
+          className={cn(
+            "text-[10px] font-bold uppercase py-1.5 px-3 whitespace-nowrap",
+            isComplete && "text-primary bg-primary/10",
+            isUploading && "text-primary bg-primary/10 italic",
+            isQueued && "text-muted-foreground",
+            isError && "text-destructive bg-destructive/10"
+          )}
+        >
+          {isComplete && "Complete"}
+          {isUploading && "Uploading"}
+          {isQueued && "Queued"}
+          {isError && "Error"}
+        </span>
+      </div>
+
+      {/* Action button */}
+      <div className="flex justify-end">
+        {isError && onRetry ? (
+          <button
+            onClick={onRetry}
+            disabled={isActionDisabled}
+            className="text-muted-foreground hover:text-primary transition-colors disabled:opacity-40"
+          >
+            <span className="material-symbols-outlined text-lg">refresh</span>
+          </button>
+        ) : isUploading ? (
+          <button
+            onClick={onCancel}
+            disabled={isActionDisabled}
+            className="text-muted-foreground hover:text-white transition-colors disabled:opacity-40"
+          >
+            <span className="material-symbols-outlined text-lg">
+              {upload.isCancelling ? "hourglass_top" : "cancel"}
+            </span>
+          </button>
+        ) : isQueued ? (
+          <button disabled className="text-muted-foreground/40 pointer-events-none">
+            <span className="material-symbols-outlined text-lg">close</span>
+          </button>
+        ) : (
+          <button
+            onClick={onDelete}
+            disabled={isActionDisabled}
+            className="text-muted-foreground hover:text-white transition-colors disabled:opacity-40"
+          >
+            <span className="material-symbols-outlined text-lg">delete</span>
           </button>
         )}
       </div>
-      {isUploading && (
-        <div className="relative h-0.5 w-full bg-[rgba(255,255,255,0.1)]">
-          <div
-            className="absolute inset-y-0 left-0 bg-primary transition-all duration-300"
-            style={{ width: `${upload.progressPct ?? 0}%` }}
-          />
-        </div>
-      )}
-      {upload.status === "error" && upload.errorMessage && (
-        <p className="text-[11px] text-destructive">{upload.errorMessage}</p>
+
+      {/* Error message - full width below */}
+      {isError && upload.errorMessage && (
+        <p className="col-span-5 text-xs text-destructive -mt-1 pl-12">
+          {upload.errorMessage}
+        </p>
       )}
     </div>
   );
