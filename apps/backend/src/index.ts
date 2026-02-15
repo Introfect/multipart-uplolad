@@ -5,6 +5,9 @@ import { userEndpoint } from "./endpoints/user";
 import { uploadsEndpoint } from "./endpoints/uploads";
 import { submissionsEndpoint } from "./endpoints/submissions";
 import { adminEndpoint } from "./endpoints/admin";
+import { applicationsEndpoint } from "./endpoints/applications";
+import { applicationStateEndpoint } from "./endpoints/applicationState";
+import { uploadAliasEndpoint } from "./endpoints/uploadAlias";
 import { cors } from "hono/cors";
 
 const app = getHono();
@@ -25,8 +28,11 @@ app.doc("/doc", {
 app.route("api/v1/auth", authEndpoint);
 app.route("api/v1/user", userEndpoint);
 app.route("api/v1/uploads", uploadsEndpoint);
+app.route("api/v1/upload", uploadAliasEndpoint);
 app.route("api/v1/submissions", submissionsEndpoint);
 app.route("api/v1/admin", adminEndpoint);
+app.route("api/v1", applicationsEndpoint);
+app.route("api/v1", applicationStateEndpoint);
 
 app.get("/api", Scalar({ url: "/doc", theme: "elysiajs", layout: "classic" }));
 

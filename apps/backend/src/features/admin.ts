@@ -43,7 +43,7 @@ function getR2PublicBaseUrl({
     return configured.replace(/\/+$/, "");
   }
 
-  return `https://${env.R2_BUCKET}.r2.dev`;
+  return `https://${env.R2_BUCKET_NAME}.r2.dev`;
 }
 
 function getR2FolderUrl({

@@ -13,6 +13,7 @@ import {
   RequiredUploadQuestionIds,
   UploadMaxFileSizeBytes,
   UploadMaxParts,
+  UploadMultipartMinThresholdBytes,
   UploadMinFileSizeBytes,
   UploadPartSizeBytes,
   UploadQuestionIds,
@@ -23,12 +24,22 @@ import {
   abortMultipartUpload,
   completeMultipartUpload,
   createMultipartUploadWithPresignedParts,
+  createSingleUploadWithPresignedUrl,
   type CompletedUploadPart,
+  type R2StorageDebugInfo,
 } from "./r2Multipart";
 
 type ServiceResult<T> =
   | { ok: true; data: T }
-  | { ok: false; errorCode: ErrorCodes; error: string };
+  | { ok: false; errorCode: ErrorCodes; error: string; debug?: R2StorageDebugInfo };
+
+const UploadTypes = {
+  SINGLE: "single",
+  MULTIPART: "multipart",
+} as const;
+
+type UploadType = (typeof UploadTypes)[keyof typeof UploadTypes];
+const SingleUploadIdPrefix = "single:";
 
 export type UploadSummary = {
   fileId: string;
@@ -75,7 +86,7 @@ function sanitizeFileName(fileName: string): string {
   return trimmed.replace(/[^a-zA-Z0-9._-]/g, "_");
 }
 
-async function getActiveTender({
+export async function getActiveTender({
   db,
   tenderId,
 }: WithDb<{ tenderId: string }>): Promise<{ id: string } | null> {
@@ -122,6 +133,7 @@ async function getOrCreateSubmission({
     .values({
       tenderId,
       userId,
+      createdBy: userId,
       status: SubmissionStatuses.DRAFT,
     })
     .returning({
@@ -155,6 +167,7 @@ function validateInitiateInput({
   questionId: UploadQuestionId;
   fileName: string;
   contentType: string;
+  uploadType: UploadType;
   totalParts: number;
 }> {
   if (!isValidQuestionId(questionId)) {
@@ -210,6 +223,10 @@ function validateInitiateInput({
       questionId,
       fileName: normalizedFileName,
       contentType: normalizedContentType,
+      uploadType:
+        fileSizeBytes < UploadMultipartMinThresholdBytes
+          ? UploadTypes.SINGLE
+          : UploadTypes.MULTIPART,
       totalParts,
     },
   } as const;
@@ -242,6 +259,14 @@ type UploadSessionRecord = {
   expiresAt: Date;
   status: string;
 };
+
+function createSingleUploadSessionId(): string {
+  return `${SingleUploadIdPrefix}${crypto.randomUUID()}`;
+}
+
+function isSingleUploadSession(uploadId: string): boolean {
+  return uploadId.startsWith(SingleUploadIdPrefix);
+}
 
 async function getUploadSession({
   db,
@@ -374,28 +399,39 @@ export async function initiateUpload({
   db,
   env,
   userId,
-  tenderId,
+  tender,
   questionId,
   fileName,
   fileSizeBytes,
   contentType,
 }: WithDbAndEnv<{
   userId: string;
-  tenderId: string;
+  tender: { id: string };
   questionId: string;
   fileName: string;
   fileSizeBytes: number;
   contentType: string;
 }>): Promise<
-  ServiceResult<{
-    uploadSessionId: string;
-    uploadId: string;
-    objectKey: string;
-    partSizeBytes: number;
-    totalParts: number;
-    expiresAt: Date;
-    parts: Array<{ partNumber: number; url: string; expiresAt: string }>;
-  }>
+  ServiceResult<
+    | {
+        uploadType: "single";
+        uploadSessionId: string;
+        uploadId: string;
+        objectKey: string;
+        expiresAt: Date;
+        url: string;
+      }
+    | {
+        uploadType: "multipart";
+        uploadSessionId: string;
+        uploadId: string;
+        objectKey: string;
+        partSizeBytes: number;
+        totalParts: number;
+        expiresAt: Date;
+        parts: Array<{ partNumber: number; url: string; expiresAt: string }>;
+      }
+  >
 > {
   const validation = validateInitiateInput({
     questionId,
@@ -407,16 +443,7 @@ export async function initiateUpload({
     return validation;
   }
 
-  const tender = await getActiveTender({ db, tenderId });
-  if (!tender) {
-    return {
-      ok: false,
-      errorCode: ErrorCodes.TENDER_NOT_FOUND,
-      error: "Tender not found",
-    } as const;
-  }
-
-  const submissionResult = await getOrCreateSubmission({ db, tenderId, userId });
+  const submissionResult = await getOrCreateSubmission({ db, tenderId: tender.id, userId });
   if (!submissionResult.ok) {
     return submissionResult;
   }
@@ -434,6 +461,59 @@ export async function initiateUpload({
     questionId: validation.data.questionId,
     fileName: validation.data.fileName,
   });
+  const expiresAt = new Date(Date.now() + UploadSessionTtlMs);
+  const isSingleUpload = validation.data.uploadType === UploadTypes.SINGLE;
+
+  if (isSingleUpload) {
+    const singleUploadResult = await createSingleUploadWithPresignedUrl({
+      env,
+      objectKey,
+      contentType: validation.data.contentType,
+    });
+    if (!singleUploadResult.ok) {
+      return singleUploadResult;
+    }
+
+    const uploadId = createSingleUploadSessionId();
+    const sessions = await db
+      .insert(UploadSessionTable)
+      .values({
+        tenderId: tender.id,
+        submissionId: submissionResult.data.id,
+        userId,
+        questionId: validation.data.questionId,
+        fileName: validation.data.fileName,
+        fileSizeBytes,
+        contentType: validation.data.contentType,
+        objectKey,
+        uploadId,
+        partSizeBytes: fileSizeBytes,
+        totalParts: 1,
+        expiresAt,
+        status: UploadSessionStatuses.INITIATED,
+      })
+      .returning({ id: UploadSessionTable.id });
+
+    if (sessions.length === 0) {
+      return {
+        ok: false,
+        errorCode: ErrorCodes.UPLOAD_CONFLICT,
+        error: "Failed to persist upload session",
+      } as const;
+    }
+
+    return {
+      ok: true,
+      data: {
+        uploadType: "single",
+        uploadSessionId: sessions[0].id,
+        uploadId,
+        objectKey,
+        expiresAt,
+        url: singleUploadResult.data.url,
+      },
+    } as const;
+  }
 
   const multipartResult = await createMultipartUploadWithPresignedParts({
     env,
@@ -444,8 +524,6 @@ export async function initiateUpload({
   if (!multipartResult.ok) {
     return multipartResult;
   }
-
-  const expiresAt = new Date(Date.now() + UploadSessionTtlMs);
 
   const sessions = await db
     .insert(UploadSessionTable)
@@ -483,6 +561,7 @@ export async function initiateUpload({
   return {
     ok: true,
     data: {
+      uploadType: "multipart",
       uploadSessionId: sessions[0].id,
       uploadId: multipartResult.data.uploadId,
       objectKey,
@@ -498,14 +577,16 @@ export async function completeUpload({
   db,
   env,
   userId,
-  tenderId,
+  tender,
   uploadSessionId,
   parts,
+  etag,
 }: WithDbAndEnv<{
   userId: string;
-  tenderId: string;
+  tender: { id: string };
   uploadSessionId: string;
-  parts: CompletedUploadPart[];
+  parts?: CompletedUploadPart[];
+  etag?: string;
 }>): Promise<
   ServiceResult<{
     fileId: string;
@@ -517,20 +598,6 @@ export async function completeUpload({
     uploadedAt: Date;
   }>
 > {
-  const validatedParts = validateCompletedParts({ parts });
-  if (!validatedParts.ok) {
-    return validatedParts;
-  }
-
-  const tender = await getActiveTender({ db, tenderId });
-  if (!tender) {
-    return {
-      ok: false,
-      errorCode: ErrorCodes.TENDER_NOT_FOUND,
-      error: "Tender not found",
-    } as const;
-  }
-
   const uploadSession = await getUploadSession({
     db,
     uploadSessionId,
@@ -561,53 +628,63 @@ export async function completeUpload({
     } as const;
   }
 
-  const submission = await getSubmission({
-    db,
-    submissionId: uploadSession.submissionId,
-  });
-  if (!submission) {
-    return {
-      ok: false,
-      errorCode: ErrorCodes.SUBMISSION_NOT_FOUND,
-      error: "Submission not found",
-    } as const;
-  }
+  const isSingleUpload = isSingleUploadSession(uploadSession.uploadId);
+  let finalizedEtag = "";
 
-  if (submission.status === SubmissionStatuses.SUBMITTED) {
-    return {
-      ok: false,
-      errorCode: ErrorCodes.SUBMISSION_ALREADY_SUBMITTED,
-      error: "Submission already submitted",
-    } as const;
-  }
+  if (isSingleUpload) {
+    const normalizedEtag = (etag ?? "").trim();
+    if (normalizedEtag.length === 0) {
+      return {
+        ok: false,
+        errorCode: ErrorCodes.INVALID_INPUT,
+        error: "etag is required for single upload completion",
+      } as const;
+    }
+    finalizedEtag = normalizedEtag;
+  } else {
+    if (!parts) {
+      return {
+        ok: false,
+        errorCode: ErrorCodes.INVALID_INPUT,
+        error: "parts are required for multipart upload completion",
+      } as const;
+    }
 
-  if (validatedParts.data.length !== uploadSession.totalParts) {
-    return {
-      ok: false,
-      errorCode: ErrorCodes.PARTS_MISMATCH,
-      error: "Provided parts count does not match upload session",
-    } as const;
-  }
+    const validatedParts = validateCompletedParts({ parts });
+    if (!validatedParts.ok) {
+      return validatedParts;
+    }
 
-  for (let partNumber = 1; partNumber <= uploadSession.totalParts; partNumber += 1) {
-    const receivedPart = validatedParts.data[partNumber - 1];
-    if (!receivedPart || receivedPart.partNumber !== partNumber) {
+    if (validatedParts.data.length !== uploadSession.totalParts) {
       return {
         ok: false,
         errorCode: ErrorCodes.PARTS_MISMATCH,
-        error: "Missing parts in complete payload",
+        error: "Provided parts count does not match upload session",
       } as const;
     }
-  }
 
-  const completionResult = await completeMultipartUpload({
-    env,
-    objectKey: uploadSession.objectKey,
-    uploadId: uploadSession.uploadId,
-    parts: validatedParts.data,
-  });
-  if (!completionResult.ok) {
-    return completionResult;
+    for (let partNumber = 1; partNumber <= uploadSession.totalParts; partNumber += 1) {
+      const receivedPart = validatedParts.data[partNumber - 1];
+      if (!receivedPart || receivedPart.partNumber !== partNumber) {
+        return {
+          ok: false,
+          errorCode: ErrorCodes.PARTS_MISMATCH,
+          error: "Missing parts in complete payload",
+        } as const;
+      }
+    }
+
+    const completionResult = await completeMultipartUpload({
+      env,
+      objectKey: uploadSession.objectKey,
+      uploadId: uploadSession.uploadId,
+      parts: validatedParts.data,
+    });
+    if (!completionResult.ok) {
+      return completionResult;
+    }
+
+    finalizedEtag = completionResult.data.etag;
   }
 
   const now = new Date();
@@ -646,7 +723,7 @@ export async function completeUpload({
       fileName: uploadSession.fileName,
       fileSizeBytes: uploadSession.fileSizeBytes,
       contentType: uploadSession.contentType,
-      etag: completionResult.data.etag,
+      etag: finalizedEtag,
       uploadedAt: now,
     })
     .returning({
@@ -689,11 +766,11 @@ export async function abortUpload({
   db,
   env,
   userId,
-  tenderId,
+  tender,
   uploadSessionId,
 }: WithDbAndEnv<{
   userId: string;
-  tenderId: string;
+  tender: { id: string };
   uploadSessionId: string;
 }>): Promise<ServiceResult<{ aborted: true }>> {
   const trimmedUploadSessionId = uploadSessionId.trim();
@@ -702,15 +779,6 @@ export async function abortUpload({
       ok: false,
       errorCode: ErrorCodes.INVALID_INPUT,
       error: "Invalid uploadSessionId",
-    } as const;
-  }
-
-  const tender = await getActiveTender({ db, tenderId });
-  if (!tender) {
-    return {
-      ok: false,
-      errorCode: ErrorCodes.TENDER_NOT_FOUND,
-      error: "Tender not found",
     } as const;
   }
 
@@ -736,33 +804,16 @@ export async function abortUpload({
     } as const;
   }
 
-  const submission = await getSubmission({
-    db,
-    submissionId: uploadSession.submissionId,
-  });
-  if (!submission) {
-    return {
-      ok: false,
-      errorCode: ErrorCodes.SUBMISSION_NOT_FOUND,
-      error: "Submission not found",
-    } as const;
-  }
-
-  if (submission.status === SubmissionStatuses.SUBMITTED) {
-    return {
-      ok: false,
-      errorCode: ErrorCodes.SUBMISSION_ALREADY_SUBMITTED,
-      error: "Submission already submitted",
-    } as const;
-  }
-
-  const abortResult = await abortMultipartUpload({
-    env,
-    objectKey: uploadSession.objectKey,
-    uploadId: uploadSession.uploadId,
-  });
-  if (!abortResult.ok) {
-    return abortResult;
+  const isSingleUpload = isSingleUploadSession(uploadSession.uploadId);
+  if (!isSingleUpload) {
+    const abortResult = await abortMultipartUpload({
+      env,
+      objectKey: uploadSession.objectKey,
+      uploadId: uploadSession.uploadId,
+    });
+    if (!abortResult.ok) {
+      return abortResult;
+    }
   }
 
   await db
@@ -773,7 +824,10 @@ export async function abortUpload({
     })
     .where(eq(UploadSessionTable.id, uploadSession.id));
 
-  return abortResult;
+  return {
+    ok: true,
+    data: { aborted: true },
+  } as const;
 }
 
 export async function getUploadStatus({

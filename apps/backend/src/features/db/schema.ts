@@ -4,6 +4,7 @@ import {
   boolean,
   index,
   integer,
+  jsonb,
   pgTable,
   text,
   timestamp,
@@ -96,6 +97,8 @@ export const TenderTable = pgTable(
   {
     id: text().primaryKey(),
     title: text().notNull(),
+    firstDateToApply: timestamp({ withTimezone: true }).notNull(),
+    lastDateToApply: timestamp({ withTimezone: true }).notNull(),
     ...CommonRows,
   },
   (t) => [
@@ -115,6 +118,9 @@ export const SubmissionTable = pgTable(
       .notNull()
       .references(() => TenderTable.id, { onDelete: "cascade" }),
     userId: text()
+      .notNull()
+      .references(() => UserTable.id, { onDelete: "cascade" }),
+    createdBy: text()
       .notNull()
       .references(() => UserTable.id, { onDelete: "cascade" }),
     status: text().notNull().default(SubmissionStatuses.DRAFT),
@@ -196,3 +202,41 @@ export const UploadedFileTable = pgTable(
     index("uploaded_file_submission_id_idx").on(t.submissionId),
   ]
 );
+
+export const ApplicationStateTable = pgTable(
+  "application_state",
+  {
+    id: text()
+      .notNull()
+      .primaryKey()
+      .$defaultFn(() => crypto.randomUUID()),
+    submissionId: text()
+      .notNull()
+      .references(() => SubmissionTable.id, { onDelete: "cascade" }),
+    data: jsonb().notNull(),
+    ...CommonRows,
+  },
+  (t) => [
+    uniqueIndex("application_state_submission_id_key")
+      .on(t.submissionId)
+      .where(sql`${t.isActive}`),
+  ]
+);
+
+export type PersistedFormState = {
+  version: 1;
+  singleUploads: Partial<Record<string, CompletedUploadFile>>;
+  multiUploads: Partial<Record<string, CompletedMultiUploadFile[]>>;
+};
+
+export type CompletedUploadFile = {
+  fileId: string;
+  fileName: string;
+  fileSize: number;
+  mimeType?: string;
+  completedAt: string;
+};
+
+export type CompletedMultiUploadFile = CompletedUploadFile & {
+  key: string;
+};

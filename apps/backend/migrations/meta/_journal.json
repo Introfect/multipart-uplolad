@@ -22,6 +22,20 @@
       "when": 1770985145116,
       "tag": "0002_add_tender_1",
       "breakpoints": true
+    },
+    {
+      "idx": 3,
+      "version": "7",
+      "when": 1771133583724,
+      "tag": "0003_eager_black_bolt",
+      "breakpoints": true
+    },
+    {
+      "idx": 4,
+      "version": "7",
+      "when": 1771180369563,
+      "tag": "0004_modern_king_cobra",
+      "breakpoints": true
     }
   ]
 }
