@@ -5,13 +5,15 @@
   "scripts": {
     "cf-typegen": "wrangler types --env dev",
     "db:generate": "dotenv -e .env -- drizzle-kit generate",
+    "db:generate:custom": "dotenv -e .env -- drizzle-kit generate --custom",
     "db:deploy": "dotenv -e .env -- drizzle-kit migrate",
     "db:start": "supabase start",
     "db:reset": "dotenv -e .env -- supabase db reset",
-    "dev": "wrangler dev --env dev",
-    "dev:remote": "wrangler dev --env dev --remote",
+    "deploy:staging": "wrangler deploy --env staging",
     "deploy:production": "wrangler deploy --env production",
-    "typecheck": "tsc --noEmit"
+    "dev": "wrangler dev --env dev",
+    "typecheck": "tsc --noEmit",
+    "dev:remote": "wrangler dev --env dev --remote"
   },
   "dependencies": {
     "@aws-sdk/client-s3": "^3.958.0",
