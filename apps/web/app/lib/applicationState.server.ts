@@ -1,17 +1,8 @@
-import type { AppLoadContext } from "@remix-run/cloudflare";
-import { fetchBackendJson } from "./backend-api.server";
+import type { AppLoadContext } from "react-router";
+import { fetchBackendJson, type BackendJsonResult } from "./backend-api.server";
 import type { PersistedFormState } from "../types/persistence.types";
 
-type ApplicationStateResponse =
-  | {
-      ok: true;
-      data: PersistedFormState;
-    }
-  | {
-      ok: false;
-      errorCode: string;
-      error: string;
-    };
+// Removed ApplicationStateResponse type since we're using BackendJsonResult directly
 
 export async function getApplicationState({
   context,
@@ -21,8 +12,8 @@ export async function getApplicationState({
   context: AppLoadContext;
   apiKey: string;
   submissionId: string;
-}): Promise<ApplicationStateResponse> {
-  return fetchBackendJson<ApplicationStateResponse>({
+}): Promise<BackendJsonResult<PersistedFormState>> {
+  return fetchBackendJson<PersistedFormState>({
     context,
     path: `/api/v1/application/${submissionId}/state`,
     init: {

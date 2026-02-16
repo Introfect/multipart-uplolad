@@ -10,16 +10,21 @@ export async function action({ context, request, params }: ActionFunctionArgs) {
       {
         status: 401,
         headers: { "Set-Cookie": await clearApiKeyCookie(request) },
-      }
+      },
     );
   }
 
   const submissionId = params.submissionId;
   if (!submissionId) {
-    return Response.json({ ok: false, error: "Missing submission ID" }, { status: 400 });
+    return Response.json(
+      { ok: false, error: "Missing submission ID" },
+      { status: 400 },
+    );
   }
 
-  const body = await request.json();
+  const body = (await request.json()) as {
+    data: import("../types/persistence.types").PersistedFormState;
+  };
 
   const backendUrl = context.cloudflare.env.BACKEND_API_URL;
   const response = await fetch(
@@ -31,7 +36,7 @@ export async function action({ context, request, params }: ActionFunctionArgs) {
         "x-api-key": apiKey,
       },
       body: JSON.stringify({ data: body.data }),
-    }
+    },
   );
 
   const data = await response.json();

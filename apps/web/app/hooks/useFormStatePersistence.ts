@@ -1,10 +1,13 @@
 import { useEffect, useMemo, useRef, useCallback, useState } from "react";
 import { useMachine } from "@xstate/react";
 import { formStateMachine } from "../stores/formStateMachine";
-import type { PersistedFormState, FormStateMachineEvents } from "../types/persistence.types";
+import type {
+  PersistedFormState,
+  FormStateMachineEvents,
+} from "../types/persistence.types";
 
 function debounce<T extends (...args: any[]) => any>(fn: T, delay: number): T {
-  let timeoutId: NodeJS.Timeout;
+  let timeoutId: ReturnType<typeof setTimeout>;
   return ((...args: any[]) => {
     clearTimeout(timeoutId);
     timeoutId = setTimeout(() => fn(...args), delay);
@@ -50,7 +53,7 @@ export function useFormStatePersistence({
           body: JSON.stringify({ data: stateToSave }),
         });
 
-        const result = await response.json();
+        const result = (await response.json()) as { ok: boolean };
 
         if (result.ok) {
           send({ type: "MARK_SAVED" });
@@ -69,7 +72,7 @@ export function useFormStatePersistence({
         }
       }
     },
-    [submissionId, send]
+    [submissionId, send],
   );
 
   // Queue or save state
@@ -87,7 +90,7 @@ export function useFormStatePersistence({
   // Debounced save
   const debouncedSave = useMemo(
     () => debounce(saveOrQueueState, 300),
-    [saveOrQueueState]
+    [saveOrQueueState],
   );
 
   // Wrapped send that triggers persistence
@@ -108,7 +111,7 @@ export function useFormStatePersistence({
         });
       }
     },
-    [send, debouncedSave]
+    [send, debouncedSave],
   );
 
   return {
